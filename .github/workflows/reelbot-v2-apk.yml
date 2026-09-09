@@ -1,3 +1,4 @@
+# one-shot rebuild trigger after Kotlin utility fixes
 name: Build ReelBot APK
 on:
   push:
