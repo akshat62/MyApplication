@@ -16,7 +16,9 @@ object AudioExtractor {
         for (i in 0 until extractor.trackCount) {
             val f = extractor.getTrackFormat(i)
             if (f.getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true) {
-                trackIndex = i; format = f; break
+                trackIndex = i
+                format = f
+                break
             }
         }
         require(trackIndex >= 0 && format != null) { "No audio track found" }
@@ -58,8 +60,11 @@ object AudioExtractor {
                     else -> if (outIndex >= 0) {
                         val buffer = decoder.getOutputBuffer(outIndex)!!
                         if (info.size > 0) {
-                            buffer.position(info.offset); buffer.limit(info.offset + info.size)
-                            val bytes = ByteArray(info.size); buffer.get(bytes); pcm.write(bytes)
+                            buffer.position(info.offset)
+                            buffer.limit(info.offset + info.size)
+                            val bytes = ByteArray(info.size)
+                            buffer.get(bytes)
+                            pcm.write(bytes)
                         }
                         outputDone = info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0
                         decoder.releaseOutputBuffer(outIndex, false)
@@ -67,7 +72,9 @@ object AudioExtractor {
                 }
             }
         }
-        decoder.stop(); decoder.release(); extractor.release()
+        decoder.stop()
+        decoder.release()
+        extractor.release()
         writeWav(raw, output, sampleRate, channels)
         raw.delete()
         return output
@@ -77,12 +84,37 @@ object AudioExtractor {
         val dataSize = raw.length()
         RandomAccessFile(wav, "rw").use { out ->
             out.setLength(0)
-            fun leShort(v: Int) { out.write(byteArrayOf((v and 0xff).toByte(), ((v shr 8) and 0xff).toByte())) }
-            fun leInt(v: Long) { out.write(byteArrayOf((v and 0xff).toByte(), ((v shr 8) and 0xff).toByte(), ((v shr 16) and 0xff).toByte(), ((v shr 24) and 0xff).toByte())) }
-            out.writeBytes("RIFF"); leInt(36 + dataSize); out.writeBytes("WAVEfmt "); leInt(16)
-            leShort(1); leShort(channels); leInt(sampleRate.toLong()); leInt((sampleRate * channels * 2).toLong())
-            leShort(channels * 2); leShort(16); out.writeBytes("data"); leInt(dataSize)
-            raw.inputStream().use { it.copyTo(out) }
+            fun leShort(v: Int) {
+                out.write(byteArrayOf((v and 0xff).toByte(), ((v shr 8) and 0xff).toByte()))
+            }
+            fun leInt(v: Long) {
+                out.write(byteArrayOf(
+                    (v and 0xff).toByte(),
+                    ((v shr 8) and 0xff).toByte(),
+                    ((v shr 16) and 0xff).toByte(),
+                    ((v shr 24) and 0xff).toByte()
+                ))
+            }
+            out.writeBytes("RIFF")
+            leInt(36 + dataSize)
+            out.writeBytes("WAVEfmt ")
+            leInt(16)
+            leShort(1)
+            leShort(channels)
+            leInt(sampleRate.toLong())
+            leInt((sampleRate * channels * 2).toLong())
+            leShort(channels * 2)
+            leShort(16)
+            out.writeBytes("data")
+            leInt(dataSize)
+            raw.inputStream().use { input ->
+                val buffer = ByteArray(1024 * 1024)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    out.write(buffer, 0, read)
+                }
+            }
         }
     }
 }
