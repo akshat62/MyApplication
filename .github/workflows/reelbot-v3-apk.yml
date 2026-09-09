@@ -16,13 +16,13 @@ jobs:
         run: |
           cat reelbot-v3-upload/source.part*.b64 > /tmp/reelbot-v3.b64
           base64 -d /tmp/reelbot-v3.b64 > /tmp/ReelBot-V3-scaffold-source.zip
-          mkdir -p /tmp/v3
+          rm -rf /tmp/v3 && mkdir -p /tmp/v3
           unzip -q /tmp/ReelBot-V3-scaffold-source.zip -d /tmp/v3
           test -f /tmp/v3/ReelBotV3/app/build.gradle.kts
+          if [ -d reelbot-v3-overrides ]; then cp -a reelbot-v3-overrides/. /tmp/v3/ReelBotV3/; fi
           sha256sum /tmp/ReelBot-V3-scaffold-source.zip
       - name: Vendor whisper.cpp v1.7.2
-        run: |
-          git clone --depth 1 --branch v1.7.2 https://github.com/ggerganov/whisper.cpp.git /tmp/v3/ReelBotV3/app/src/main/cpp/whisper.cpp
+        run: git clone --depth 1 --branch v1.7.2 https://github.com/ggerganov/whisper.cpp.git /tmp/v3/ReelBotV3/app/src/main/cpp/whisper.cpp
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -36,7 +36,13 @@ jobs:
         with:
           gradle-version: '8.7'
       - name: Build debug APK
-        run: gradle -p /tmp/v3/ReelBotV3 :app:assembleDebug --no-daemon --stacktrace
+        run: |
+          set +e
+          gradle -p /tmp/v3/ReelBotV3 :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee /tmp/reelbot-build.log
+          status=${PIPESTATUS[0]}
+          echo '===== REELBOT BUILD ERRORS ====='
+          grep -E '(^e: |^.*error: |Unresolved reference|Argument type mismatch|Type mismatch|No value passed|Could not resolve|Execution failed for task|What went wrong|CMake Error|ninja: error)' /tmp/reelbot-build.log | tail -250 || true
+          exit $status
       - name: Verify APK
         run: |
           APK=/tmp/v3/ReelBotV3/app/build/outputs/apk/debug/app-debug.apk
