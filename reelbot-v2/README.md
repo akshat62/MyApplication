@@ -7,3 +7,5 @@ Implemented: Android video import; on-device Whisper transcription; transcript-a
 Direct API publishing needs a Professional Instagram account and a valid Content Publishing access token supplied by the user's Meta app. ReelBot never embeds a Meta app secret in the APK. Without API credentials, users can share generated MP4s to the installed Instagram app.
 
 The free whisper-android AAR used by this build targets arm64-v8a. The app is minSdk 26 and arm64-v8a.
+
+Build sync: 2026-09-09.
