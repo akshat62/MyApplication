@@ -38,10 +38,11 @@ jobs:
       - name: Build debug APK
         run: |
           set +e
-          gradle -p /tmp/v3/ReelBotV3 :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee /tmp/reelbot-build.log
-          status=${PIPESTATUS[0]}
+          gradle -p /tmp/v3/ReelBotV3 :app:assembleDebug --no-daemon --stacktrace > /tmp/reelbot-build.log 2>&1
+          status=$?
           echo '===== REELBOT BUILD ERRORS ====='
-          grep -E '(^e: |^.*error: |Unresolved reference|Argument type mismatch|Type mismatch|No value passed|Could not resolve|Execution failed for task|What went wrong|CMake Error|ninja: error)' /tmp/reelbot-build.log | tail -250 || true
+          grep -E '(^e: |^.*error: |Unresolved reference|Argument type mismatch|Type mismatch|No value passed|Could not resolve|Execution failed for task|What went wrong|CMake Error|ninja: error|FAILURE:)' /tmp/reelbot-build.log | tail -300 || true
+          echo '===== END ERRORS ====='
           exit $status
       - name: Verify APK
         run: |
