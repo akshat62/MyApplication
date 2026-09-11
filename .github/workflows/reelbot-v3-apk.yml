@@ -1,28 +1,61 @@
-name: Diagnose ReelBot V3 Startup
+name: Build ReelBot V3 Safe Start APK
 on:
   push:
     branches: [ master ]
 permissions:
   contents: read
 jobs:
-  diagnose:
+  build:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
         with:
           ref: reelbot-v3-build-20260909
-      - name: Inspect startup UI source
+      - name: Reassemble uploaded V3 source
         run: |
           cat reelbot-v3-upload/source.part*.b64 > /tmp/reelbot-v3.b64
           base64 -d /tmp/reelbot-v3.b64 > /tmp/ReelBot-V3-scaffold-source.zip
           rm -rf /tmp/v3 && mkdir -p /tmp/v3
           unzip -q /tmp/ReelBot-V3-scaffold-source.zip -d /tmp/v3
+          test -f /tmp/v3/ReelBotV3/app/build.gradle.kts
           if [ -d reelbot-v3-overrides ]; then cp -a reelbot-v3-overrides/. /tmp/v3/ReelBotV3/; fi
-          ROOT=/tmp/v3/ReelBotV3/app/src/main/java
-          echo '===== NAVIGATION FILES ====='
-          find "$ROOT" -type f \( -name '*NavHost*.kt' -o -name '*Navigation*.kt' -o -name '*ViewModelFactory*.kt' \) -print -exec sh -c 'echo ----- $1; sed -n "1,260p" "$1"' _ {} \;
-          echo '===== HOME SCREEN FILES ====='
-          find "$ROOT" -type f \( -name 'HomeScreen.kt' -o -name 'HomeViewModel.kt' \) -print -exec sh -c 'echo ----- $1; sed -n "1,320p" "$1"' _ {} \;
-          echo '===== DATABASE ====='
-          find "$ROOT" -type f -name 'ReelBotDatabase.kt' -print -exec sh -c 'echo ----- $1; cat "$1"' _ {} \;
-          exit 1
+      - name: Vendor whisper.cpp v1.7.2
+        run: git clone --depth 1 --branch v1.7.2 https://github.com/ggerganov/whisper.cpp.git /tmp/v3/ReelBotV3/app/src/main/cpp/whisper.cpp
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK, NDK and CMake
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;27.0.12077973" "cmake;3.22.1"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+      - name: Build debug APK
+        run: |
+          set +e
+          gradle -p /tmp/v3/ReelBotV3 :app:assembleDebug --no-daemon --stacktrace > /tmp/reelbot-build.log 2>&1
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            echo '===== REELBOT BUILD LOG TAIL ====='
+            tail -500 /tmp/reelbot-build.log
+            echo '===== END BUILD LOG ====='
+          fi
+          exit $status
+      - name: Verify APK package
+        run: |
+          APK=/tmp/v3/ReelBotV3/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          file "$APK"
+          unzip -t "$APK" >/dev/null
+          sha256sum "$APK"
+          $ANDROID_HOME/build-tools/36.0.0/aapt dump badging "$APK" | head -20
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ReelBot-V3-safe-start
+          path: /tmp/v3/ReelBotV3/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 1
