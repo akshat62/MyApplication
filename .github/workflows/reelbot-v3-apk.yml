@@ -20,7 +20,12 @@ jobs:
           unzip -q /tmp/ReelBot-V3-scaffold-source.zip -d /tmp/v3
           test -f /tmp/v3/ReelBotV3/app/build.gradle.kts
           if [ -d reelbot-v3-overrides ]; then cp -a reelbot-v3-overrides/. /tmp/v3/ReelBotV3/; fi
-          sha256sum /tmp/ReelBot-V3-scaffold-source.zip
+          echo '===== AndroidManifest.xml ====='
+          cat /tmp/v3/ReelBotV3/app/src/main/AndroidManifest.xml
+          echo '===== ReelBotApp.kt ====='
+          grep -R -n -A80 -B10 'class ReelBotApp' /tmp/v3/ReelBotV3/app/src/main/java || true
+          echo '===== loadLibrary references ====='
+          grep -R -n 'System.loadLibrary\|loadLibrary(' /tmp/v3/ReelBotV3/app/src/main/java || true
       - name: Vendor whisper.cpp v1.7.2
         run: git clone --depth 1 --branch v1.7.2 https://github.com/ggerganov/whisper.cpp.git /tmp/v3/ReelBotV3/app/src/main/cpp/whisper.cpp
       - uses: actions/setup-java@v5
@@ -54,8 +59,7 @@ jobs:
           sha256sum "$APK"
       - uses: actions/upload-artifact@v4
         with:
-          name: ReelBot-V3-startup-fixed
+          name: ReelBot-V3-diagnostic
           path: /tmp/v3/ReelBotV3/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 1
-# trigger startup-fix build
