@@ -11,19 +11,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: reelbot-v3-build-20260909
-      - name: Inspect startup source
+      - name: Inspect startup UI source
         run: |
           cat reelbot-v3-upload/source.part*.b64 > /tmp/reelbot-v3.b64
           base64 -d /tmp/reelbot-v3.b64 > /tmp/ReelBot-V3-scaffold-source.zip
           rm -rf /tmp/v3 && mkdir -p /tmp/v3
           unzip -q /tmp/ReelBot-V3-scaffold-source.zip -d /tmp/v3
           if [ -d reelbot-v3-overrides ]; then cp -a reelbot-v3-overrides/. /tmp/v3/ReelBotV3/; fi
-          echo '===== AndroidManifest.xml ====='
-          cat /tmp/v3/ReelBotV3/app/src/main/AndroidManifest.xml
-          echo '===== ReelBotApp.kt ====='
-          grep -R -n -A100 -B20 'class ReelBotApp' /tmp/v3/ReelBotV3/app/src/main/java || true
-          echo '===== App-wide loadLibrary references ====='
-          grep -R -n 'System.loadLibrary\|loadLibrary(' /tmp/v3/ReelBotV3/app/src/main/java || true
-          echo '===== App startup constructors ====='
-          grep -R -n 'Room.databaseBuilder\|ReelBotDatabase\|ReelRepository(' /tmp/v3/ReelBotV3/app/src/main/java || true
+          ROOT=/tmp/v3/ReelBotV3/app/src/main/java
+          echo '===== NAVIGATION FILES ====='
+          find "$ROOT" -type f \( -name '*NavHost*.kt' -o -name '*Navigation*.kt' -o -name '*ViewModelFactory*.kt' \) -print -exec sh -c 'echo ----- $1; sed -n "1,260p" "$1"' _ {} \;
+          echo '===== HOME SCREEN FILES ====='
+          find "$ROOT" -type f \( -name 'HomeScreen.kt' -o -name 'HomeViewModel.kt' \) -print -exec sh -c 'echo ----- $1; sed -n "1,320p" "$1"' _ {} \;
+          echo '===== DATABASE ====='
+          find "$ROOT" -type f -name 'ReelBotDatabase.kt' -print -exec sh -c 'echo ----- $1; cat "$1"' _ {} \;
           exit 1
