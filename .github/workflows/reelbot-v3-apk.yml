@@ -54,8 +54,8 @@ jobs:
           sha256sum "$APK"
       - uses: actions/upload-artifact@v4
         with:
-          name: ReelBot-V3-debug
+          name: ReelBot-V3-startup-fixed
           path: /tmp/v3/ReelBotV3/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 1
-# trigger kotlin-source-fixes build
+# trigger startup-fix build
