@@ -9,6 +9,16 @@ Later commit `626edcb06c79b0b4ec2b3489972e5f1ebcdfef84` adds playback/face tests
 
 ## Downloads
 
+Final separate packages:
+- [ReelBot-V3-Fixed.apk package](https://github.com/akshat62/MyApplication/actions/runs/34749201364/artifacts/10315002880)
+- [Complete corrected source](https://github.com/akshat62/MyApplication/actions/runs/34749201364/artifacts/10314449291)
+- [Executed test evidence and real exported Reels](https://github.com/akshat62/MyApplication/actions/runs/34749201364/artifacts/10314648774)
+
+APK SHA-256: `e56c1d503d45589f65fe7599c1ac9d20c8e9d56a4d9eb611dbd154fcc61766ca`.
+GitHub artifact downloads are ZIP containers; extract `ReelBot-V3-Fixed.apk` to install.
+
+Original verification bundle:
+
 [Verified APK, complete corrected source ZIP, exported Reel, transcript, screenshots, and logs](https://github.com/akshat62/MyApplication/actions/runs/34747988107/artifacts/10315435517)
 
 Inside the download:
@@ -52,7 +62,7 @@ Device: Android 15/API 35 AOSP x86_64 emulator, hardware-accelerated GitHub Ubun
 
 [Successful complete local-pipeline run](https://github.com/akshat62/MyApplication/actions/runs/34747988107).
 [Exported-frame and metadata inspection](https://github.com/akshat62/MyApplication/actions/runs/34748513696).
-[Successful focused playback/face verification](https://github.com/akshat62/MyApplication/actions/runs/34748943778). The redundant queued full rerun is being cancelled.
+[Successful focused playback/face verification](https://github.com/akshat62/MyApplication/actions/runs/34748943778). The redundant full rerun is not used as verification evidence.
 
 The successful startup test took 8.7 seconds, three pipeline tests 243.8 seconds, and persistence test 0.032 seconds. Focused Android playback passed in 3.6 seconds and face-composition verification in 5.1 seconds. Real transcription took approximately 70 seconds for 30 seconds of speech on this emulator. These are emulator observations, not performance promises for a phone.
 
