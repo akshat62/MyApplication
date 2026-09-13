@@ -3,6 +3,9 @@ project(reelbot_whisper)
 
 set(CMAKE_CXX_STANDARD 17)
 
+# Speech inference must remain optimized in debug APKs too; retain debug symbols.
+add_compile_options(-O3)
+
 # whisper.cpp is vendored as a git submodule at app/src/main/cpp/whisper.cpp/ :
 #   git submodule add https://github.com/ggerganov/whisper.cpp app/src/main/cpp/whisper.cpp
 # Pin to a specific tagged release rather than tracking main, so builds are reproducible.

@@ -24,6 +24,9 @@ extern "C" {
 JNIEXPORT jlong JNICALL
 Java_com_reelbot_mobile_ai_native_WhisperNative_nativeLoadModel(
         JNIEnv *env, jobject /*thiz*/, jstring modelPath) {
+    whisper_log_set([](enum ggml_log_level level, const char *text, void *) {
+        __android_log_write(level == GGML_LOG_LEVEL_ERROR ? ANDROID_LOG_ERROR : ANDROID_LOG_INFO, LOG_TAG, text);
+    }, nullptr);
     const char *path = env->GetStringUTFChars(modelPath, nullptr);
 
     struct whisper_context_params cparams = whisper_context_default_params();
@@ -62,10 +65,12 @@ Java_com_reelbot_mobile_ai_native_WhisperNative_nativeTranscribe(
     jsize numSamples = env->GetArrayLength(samples);
     jfloat *sampleData = env->GetFloatArrayElements(samples, nullptr);
 
-    if (!sampleData || numSamples <= 0) return nullptr;
+    if (!sampleData) return nullptr;
+    if (numSamples <= 0) { env->ReleaseFloatArrayElements(samples, sampleData, JNI_ABORT); return nullptr; }
 
     struct whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
     params.print_progress = false;
+    params.progress_callback = [](whisper_context *, whisper_state *, int progress, void *) { LOGI("Inference progress: %d%%", progress); };
     params.print_special = false;
     params.print_realtime = false;
     params.print_timestamps = false;
@@ -78,6 +83,7 @@ Java_com_reelbot_mobile_ai_native_WhisperNative_nativeTranscribe(
     std::string langStr;
     if (language != nullptr) {
         const char *raw = env->GetStringUTFChars(language, nullptr);
+        if (!raw) { env->ReleaseFloatArrayElements(samples, sampleData, JNI_ABORT); return nullptr; }
         langStr = raw;
         env->ReleaseStringUTFChars(language, raw);
         if (!langStr.empty() && langStr != "auto") {
