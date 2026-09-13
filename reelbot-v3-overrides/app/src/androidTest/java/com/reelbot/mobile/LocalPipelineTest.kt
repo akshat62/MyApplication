@@ -18,6 +18,7 @@ class LocalPipelineTest {
         val video = File(app.filesDir, "real-speech-fixture.mp4")
         assertTrue("Install the real speech fixture before running this test", video.isFile)
         val manager = ModelManager(app)
+        if (InstrumentationRegistry.getArguments().getString("downloadModel") == "true") manager.download(WhisperModelSpec.BASE)
         manager.refreshState(WhisperModelSpec.BASE)
         assertEquals(ModelState.INSTALLED, manager.state.value)
         val wav = AudioExtractor().extract(video, File(app.cacheDir, "test-speech.wav"))

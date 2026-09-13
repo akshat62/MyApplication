@@ -27,7 +27,7 @@ class SubtitleOverlay(
 
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = subtitleStyle.textColor
-        textSize = subtitleStyle.fontSizeSp * 3f
+        textSize = subtitleStyle.fontSizeSp
         typeface = android.graphics.Typeface.create(android.graphics.Typeface.DEFAULT_BOLD, android.graphics.Typeface.BOLD)
         textAlign = Paint.Align.CENTER
         setShadowLayer(6f, 0f, 2f, Color.BLACK)
@@ -56,7 +56,7 @@ class SubtitleOverlay(
 
     private fun activeLineFor(presentationMs: Long): String? {
         val segment = segments.firstOrNull { presentationMs in it.startMs..it.endMs } ?: return null
-        return wrapToMaxWords(segment.text, subtitleStyle.maxWordsPerLine)
+        return segment.text
     }
 
     private fun wrapToMaxWords(text: String, maxWords: Int): String {
@@ -76,7 +76,7 @@ class SubtitleOverlay(
             paint.textSize -= 2f
         } while (true)
         val x = (outputWidth - width) / 2f
-        val y = outputHeight * (1 - style.bottomSafeMarginFraction) - layout.height
+        val y = outputHeight * (1 - subtitleStyle.bottomSafeMarginFraction) - layout.height
         canvas.drawRoundRect(RectF(x - 16, y - 12, x + width + 16, y + layout.height + 12), 20f, 20f, backgroundPaint)
         canvas.save()
         canvas.translate(x, y)

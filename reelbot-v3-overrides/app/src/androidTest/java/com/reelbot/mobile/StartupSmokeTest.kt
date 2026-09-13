@@ -15,6 +15,9 @@ class StartupSmokeTest {
                 compose.waitForIdle()
             }
         }
+        compose.onNodeWithText("Create Reels").performClick()
+        compose.onNodeWithText("Select video").assertExists()
+        compose.onAllNodesWithText("Home").onLast().performClick()
         compose.activityRule.scenario.recreate()
         compose.waitUntil(30000) { compose.onAllNodesWithText("Home").fetchSemanticsNodes().isNotEmpty() }
         compose.onAllNodesWithText("Settings").onLast().performClick()
