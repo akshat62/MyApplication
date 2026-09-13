@@ -55,7 +55,8 @@ jobs:
           $ANDROID_HOME/build-tools/36.0.0/aapt dump badging "$APK" | head -20
       - uses: actions/upload-artifact@v4
         with:
-          name: ReelBot-V3-safe-start
+          name: ReelBot-V3-nav-fix
           path: /tmp/v3/ReelBotV3/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 1
+# trigger exact bottom-nav NPE fix
