@@ -1,0 +1,18 @@
+name: Inspect ReelBot device evidence
+on:
+  push:
+    branches: [reelbot-v3-diagnostics-20260913]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read recorded Android diagnostics
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh run download 34747251243 --repo "$GITHUB_REPOSITORY" --dir evidence
+          find evidence -type f -name '*logcat*' -exec sh -c 'echo "$1"; grep -E "ReelBot|AndroidRuntime|TestRunner|whisper_|FATAL|Fatal|ggml" "$1" | tail -180' sh {} \;
