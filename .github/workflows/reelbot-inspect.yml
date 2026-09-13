@@ -1,4 +1,4 @@
-name: Inspect ReelBot device evidence
+name: Verify ReelBot playback and face crop
 on:
   push:
     branches: [reelbot-v3-diagnostics-20260913]
@@ -6,28 +6,76 @@ permissions:
   contents: read
   actions: read
 jobs:
-  inspect:
+  android_checks:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
     steps:
-      - name: Inspect actual exported Reel
+      - uses: actions/checkout@v4
+        with:
+          ref: 626edcb06c79b0b4ec2b3489972e5f1ebcdfef84
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Prepare test source and verified APK
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh run download 34747988107 --repo "$GITHUB_REPOSITORY" --dir evidence
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq ffmpeg
+          gh run download 34747988107 --repo "$GITHUB_REPOSITORY" --dir prior
           python - <<'PY'
-          from pathlib import Path
-          import subprocess,base64
-          root=Path('evidence')
-          for name in ('transcript.txt','output-streams.txt','persistence.txt','android-model-download.txt','decode-errors.txt'):
-            for p in root.rglob(name):
-              print('EVIDENCE_FILE',name)
-              print(p.read_text())
-          video=next(root.rglob('verified-reel.mp4'))
-          subprocess.run(['ffmpeg','-y','-ss','5','-i',str(video),'-frames:v','1','-vf','scale=270:480','frame.jpg'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-          print('FRAME_BASE64_START')
-          print(base64.b64encode(Path('frame.jpg').read_bytes()).decode())
-          print('FRAME_BASE64_END')
+          import base64,io,pathlib,zipfile,shutil
+          p=pathlib.Path('reelbot-v3-upload')
+          z=zipfile.ZipFile(io.BytesIO(base64.b64decode(''.join(f.read_text() for f in sorted(p.glob('source.part*.b64'))))))
+          z.extractall('build-source')
+          shutil.copytree('reelbot-v3-overrides','build-source/ReelBotV3',dirs_exist_ok=True)
           PY
+          sdkmanager 'platforms;android-36' 'build-tools;34.0.0'
+          git clone --depth 1 --branch v1.7.2 https://github.com/ggml-org/whisper.cpp.git build-source/ReelBotV3/app/src/main/cpp/whisper.cpp
+      - name: Compile instrumentation only
+        working-directory: build-source/ReelBotV3
+        run: gradle assembleDebugAndroidTest --no-daemon
+      - name: Prepare playback and off-center face fixtures
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg ripgrep
+          mkdir -p build-source/ReelBotV3/test-input
+          find prior -name ReelBot-V3-Fixed.apk -exec cp {} build-source/ReelBotV3/verified-app.apk \;
+          find prior -name verified-reel.mp4 -exec cp {} build-source/ReelBotV3/test-input/verified-reel.mp4 \;
+          "$ANDROID_HOME/build-tools/34.0.0/apksigner" sign --ks "$HOME/.android/debug.keystore" --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android --out build-source/ReelBotV3/test-app.apk build-source/ReelBotV3/verified-app.apk
+          curl --fail --location --retry 3 https://raw.githubusercontent.com/scikit-image/scikit-image/v0.24.0/skimage/data/astronaut.png -o build-source/ReelBotV3/test-input/astronaut.png
+          ffmpeg -y -loop 1 -i build-source/ReelBotV3/test-input/astronaut.png -i build-source/ReelBotV3/app/src/main/cpp/whisper.cpp/samples/jfk.wav -vf 'scale=360:360,pad=640:360:0:0:black' -t 3 -r 24 -c:v libx264 -pix_fmt yuv420p -c:a aac build-source/ReelBotV3/test-input/face-fixture.mp4
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        timeout-minutes: 8
+        with:
+          api-level: 35
+          arch: x86_64
+          working-directory: build-source/ReelBotV3
+          script: |
+            mkdir -p test-results
+            adb install -r test-app.apk
+            adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            adb shell am start -W -n com.reelbot.mobile/.MainActivity
+            adb push test-input/verified-reel.mp4 /data/local/tmp/verified-reel.mp4
+            adb push test-input/face-fixture.mp4 /data/local/tmp/face-fixture.mp4
+            adb shell run-as com.reelbot.mobile mkdir -p files/reels
+            adb shell run-as com.reelbot.mobile cp /data/local/tmp/verified-reel.mp4 files/reels/verified-reel.mp4
+            adb shell run-as com.reelbot.mobile cp /data/local/tmp/face-fixture.mp4 files/face-fixture.mp4
+            timeout -k 10s 90s adb shell am instrument -w -e class com.reelbot.mobile.PlaybackTest com.reelbot.mobile.test/androidx.test.runner.AndroidJUnitRunner | tee test-results/android-playback.txt
+            timeout -k 10s 120s adb shell am instrument -w -e class com.reelbot.mobile.FaceCropTest com.reelbot.mobile.test/androidx.test.runner.AndroidJUnitRunner | tee test-results/face-crop.txt
+            adb logcat -d > test-results/logcat.txt
+            adb exec-out run-as com.reelbot.mobile cat files/reels/face-verified.mp4 > test-results/face-verified.mp4
+            rg -F 'OK (1 test)' test-results/android-playback.txt
+            rg -F 'OK (1 test)' test-results/face-crop.txt
+      - name: Collect verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ReelBot-playback-and-face-evidence
+          path: build-source/ReelBotV3/test-results/
