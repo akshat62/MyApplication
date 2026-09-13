@@ -5,6 +5,7 @@ import com.reelbot.mobile.data.model.FailureReason
 import com.reelbot.mobile.data.model.ModelState
 import com.reelbot.mobile.data.model.TranscriptSegment
 import com.reelbot.mobile.data.model.WhisperModelSpec
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -21,7 +22,7 @@ class ModelNotReadyException(val state: ModelState) :
  * native library isn't built, or if whisper_full fails, callers get a specific thrown
  * exception and the job is marked FAILED with that reason — never a fabricated transcript.
  */
-class TranscriptionEngine(private val modelManager: ModelManager) {
+class TranscriptionEngine(private val modelManager: ModelManager, private val chunkSeconds: Int = 60) {
 
     suspend fun transcribe(
         wavFile: File,
@@ -55,13 +56,22 @@ class TranscriptionEngine(private val modelManager: ModelManager) {
 
         modelManager.setRuntimeState(ModelState.READY)
         try {
-            val samples = readWavAsFloatPcm(wavFile)
             val threads = Runtime.getRuntime().availableProcessors().coerceIn(2, 6)
-            android.util.Log.i("ReelBotWhisper", "Transcribing ${samples.size} samples on $threads threads")
-            val raw = WhisperNative.nativeTranscribe(ctxPtr, samples, language, threads)
-                ?: throw PipelineException(FailureReason.TRANSCRIPTION_FAILED, "whisper_full returned an error")
-
-            val segments = parseSegments(raw)
+            val segments = mutableListOf<TranscriptSegment>()
+            PcmChunkReader(wavFile, chunkSeconds).use { reader ->
+                while (true) {
+                    kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                    val chunk = reader.next() ?: break
+                    android.util.Log.i("ReelBotWhisper", "Transcribing ${chunk.startMs}..${chunk.endMs} of ${reader.durationMs} ms")
+                    val raw = WhisperNative.nativeTranscribe(ctxPtr, chunk.samples, language, threads)
+                        ?: throw PipelineException(FailureReason.TRANSCRIPTION_FAILED, "Whisper failed at ${chunk.startMs / 1000} seconds")
+                    segments += parseSegments(raw).mapNotNull { segment ->
+                        val start = (chunk.startMs + segment.startMs).coerceAtMost(chunk.endMs)
+                        val end = (chunk.startMs + segment.endMs).coerceAtMost(chunk.endMs)
+                        if (end > start) segment.copy(startMs = start, endMs = end) else null
+                    }
+                }
+            }
             android.util.Log.i("ReelBotWhisper", "Transcription returned ${segments.size} segments")
             if (segments.isEmpty()) {
                 throw PipelineException(FailureReason.NO_SPEECH_DETECTED)
@@ -69,29 +79,6 @@ class TranscriptionEngine(private val modelManager: ModelManager) {
             segments
         } finally {
             WhisperNative.nativeRelease(ctxPtr)
-        }
-    }
-
-    /** Reads the 16kHz mono 16-bit PCM WAV produced by AudioExtractor and converts it to
-     *  the float32 [-1, 1] format whisper_full expects. */
-    private fun readWavAsFloatPcm(wavFile: File): FloatArray {
-        RandomAccessFile(wavFile, "r").use { raf ->
-            val header = ByteArray(44)
-            raf.readFully(header)
-            val h = ByteBuffer.wrap(header).order(ByteOrder.LITTLE_ENDIAN)
-            require(String(header, 0, 4) == "RIFF" && String(header, 8, 4) == "WAVE" && h.getShort(20).toInt() == 1 && h.getShort(22).toInt() == 1 && h.getInt(24) == 16000 && h.getShort(34).toInt() == 16) { "Expected 16 kHz mono PCM16 WAV." }
-            require(raf.length() in 46..(16000L * 2 * 60 * 30 + 44)) { "Audio is empty or exceeds the 30-minute on-device limit." }
-            val dataSize = (raf.length() - 44).toInt()
-            val pcmBytes = ByteArray(dataSize)
-            raf.readFully(pcmBytes)
-
-            val buffer = ByteBuffer.wrap(pcmBytes).order(ByteOrder.LITTLE_ENDIAN)
-            val sampleCount = dataSize / 2
-            val floats = FloatArray(sampleCount)
-            for (i in 0 until sampleCount) {
-                floats[i] = buffer.short / 32768f
-            }
-            return floats
         }
     }
 

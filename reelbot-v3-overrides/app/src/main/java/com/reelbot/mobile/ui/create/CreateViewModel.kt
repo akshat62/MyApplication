@@ -51,7 +51,8 @@ class CreateViewModel(
             try {
                 appContext.contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 val meta = withContext(Dispatchers.IO) { readMetadata(uri, appContext.contentResolver) }
-                require(meta.durationMs in 1..1800000 && meta.width > 0 && meta.height > 0) { "The selected file has no supported video track." }
+                require(meta.width > 0 && meta.height > 0) { "The selected file has no readable video track." }
+                require(meta.durationMs > 0) { "Could not read the video duration. Try saving a local copy and selecting it again." }
                 _uiState.value = _uiState.value.copy(selectedVideo = meta, submitError = null)
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e

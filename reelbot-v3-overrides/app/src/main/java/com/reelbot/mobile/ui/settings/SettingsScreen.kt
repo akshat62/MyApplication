@@ -62,7 +62,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                         Button(onClick = viewModel::downloadModel) { Text("Download / repair model") }
                     }
                     error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-                    Text("After download, transcription and video processing run on this phone. Videos up to 30 minutes are supported.")
+                    Text("After download, transcription and video processing run on this phone. There is no fixed video-duration limit. Long videos take more time and storage.")
                 }
             }
         }

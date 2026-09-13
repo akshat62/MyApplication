@@ -15,7 +15,7 @@ trap finish_tests EXIT
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 adb shell mkdir -p /sdcard/Download
-adb push test-input/real-speech-fixture.mp4 /sdcard/Download/real-speech-fixture.mp4
+adb push test-input/long-video.mp4 /sdcard/Download/real-speech-fixture.mp4
 adb logcat -c
 adb logcat -v threadtime > test-results/logcat-live.txt 2>&1 &
 reelbot_log_pid=$!

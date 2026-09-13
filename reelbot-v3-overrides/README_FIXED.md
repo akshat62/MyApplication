@@ -14,7 +14,7 @@ The application ID is `com.reelbot.mobile`. Debug builds include arm64-v8a and x
 
 ## Mobile workflow
 
-Download the verified Whisper Base multilingual model in Settings, select a local video with the Android document picker, then start processing. Processing is local and imports run sequentially. Source videos are limited to 30 minutes to bound transcription memory. Generated clips require review. Preview and edit captions/hashtags in the queue.
+Download the verified Whisper Base multilingual model in Settings, select a local video with the Android document picker, then start processing. Processing is local and imports run sequentially. There is no fixed source-duration limit. Transcription reads one minute of PCM at a time and retains original timestamps. Available storage and processing time still determine practical capacity. Generated clips require review. Preview and edit captions/hashtags in the queue.
 
 Highlight scores are deterministic transcript heuristics, not predicted engagement. Face composition uses one averaged face-aware crop per clip with a center fallback, not continuous speaker tracking. Subtitles show complete timestamped transcript segments.
 

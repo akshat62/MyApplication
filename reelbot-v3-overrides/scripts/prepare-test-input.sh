@@ -8,3 +8,5 @@ ffmpeg -y -f lavfi -i testsrc2=size=640x360:rate=24 -stream_loop 2 -i app/src/ma
 # NASA astronaut portrait distributed with scikit-image; deliberately off-center.
 curl --fail --location --retry 3 https://raw.githubusercontent.com/scikit-image/scikit-image/v0.24.0/skimage/data/astronaut.png -o test-input/astronaut.png
 ffmpeg -y -loop 1 -i test-input/astronaut.png -i app/src/main/cpp/whisper.cpp/samples/jfk.wav -vf 'scale=360:360,pad=640:360:0:0:black' -t 3 -r 24 -c:v libx264 -pix_fmt yuv420p -c:a aac test-input/face-fixture.mp4
+
+ffmpeg -y -f lavfi -i color=c=blue:s=320x180:r=1 -t 1860 -c:v libx264 -pix_fmt yuv420p test-input/long-video.mp4
