@@ -55,17 +55,35 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - uses: reactivecircus/android-emulator-runner@v2
+        timeout-minutes: 20
         with:
           api-level: 35
           arch: x86_64
           working-directory: build-source/ReelBotV3
           script: bash scripts/device-tests.sh
+      - name: Package corrected APK and complete source
+        if: always()
+        run: |
+          mkdir -p deliverables
+          cp build-source/ReelBotV3/app/build/outputs/apk/debug/app-debug.apk deliverables/ReelBot-V3-Fixed.apk
+          python - <<'PY'
+          from pathlib import Path
+          import zipfile
+          root=Path('build-source/ReelBotV3')
+          excluded={'.git','.gradle','.cxx','build','.idea','test-input','test-results'}
+          with zipfile.ZipFile('deliverables/ReelBot-V3-Corrected-Source.zip','w',zipfile.ZIP_DEFLATED) as z:
+            for p in root.rglob('*'):
+              rel=p.relative_to(root)
+              if p.is_file() and not excluded.intersection(rel.parts) and p.name != 'local.properties':
+                z.write(p,Path('ReelBotV3')/rel)
+          PY
       - name: Collect test evidence and APK
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ReelBot-V3-build-and-test-evidence
           path: |
+            deliverables/
             build-source/ReelBotV3/app/build/outputs/apk/
             build-source/ReelBotV3/app/build/reports/
             build-source/ReelBotV3/test-results/
