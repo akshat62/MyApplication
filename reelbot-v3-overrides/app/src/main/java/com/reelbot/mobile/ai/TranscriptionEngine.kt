@@ -40,6 +40,7 @@ class TranscriptionEngine(private val modelManager: ModelManager) {
         val ctxPtr = try {
             WhisperNative.nativeLoadModel(modelFile.absolutePath)
         } catch (e: LinkageError) {
+            modelManager.setRuntimeState(ModelState.FAILED)
             throw PipelineException(
                 FailureReason.TRANSCRIPTION_FAILED,
                 "Native Whisper library failed to load: ${e.message}"

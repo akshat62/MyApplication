@@ -46,6 +46,21 @@ class ReelPipelineWorker(
 
     override suspend fun doWork(): Result {
         val importId = inputData.getString(KEY_IMPORT_ID) ?: return Result.failure()
+        return try {
+            processImport(importId)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            android.util.Log.e("ReelBotPipeline", "Processing failed", e)
+            runCatching { failAll(repo.getJobsForImport(importId).filter { !it.status.isTerminal }, FailureReason.UNKNOWN, e.stackTraceToString()) }
+            Result.failure()
+        } finally {
+            faceCropPlanner.close()
+            File(applicationContext.cacheDir, "staging/$importId").deleteRecursively()
+        }
+    }
+
+    private suspend fun processImport(importId: String): Result {
         setForeground(buildForegroundInfo("Preparing video"))
 
         val sourceVideo = repo.getSourceVideo(importId) ?: return Result.failure()
@@ -114,8 +129,6 @@ class ReelPipelineWorker(
             renderOne(job, candidate, sourceUri, sourceVideo.durationMs)
         }
 
-        stagingDir.deleteRecursively()
-        faceCropPlanner.close()
         return if (repo.getJobsForImport(importId).any { it.status == JobStatus.FAILED }) Result.failure() else Result.success()
     }
 

@@ -43,12 +43,15 @@ class AudioExtractor {
         var srcSampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
         var srcChannelCount = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
 
+        var allocatedCodec: MediaCodec? = null
         val codec = try {
-            MediaCodec.createDecoderByType(mime).apply {
-                configure(format, null, null, 0)
-                start()
+            MediaCodec.createDecoderByType(mime).also { decoder ->
+                allocatedCodec = decoder
+                decoder.configure(format, null, null, 0)
+                decoder.start()
             }
         } catch (e: Exception) {
+            allocatedCodec?.release()
             extractor.release()
             throw PipelineException(FailureReason.UNSUPPORTED_CODEC, "No decoder available for $mime: ${e.message}")
         }
