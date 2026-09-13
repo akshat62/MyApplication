@@ -10,9 +10,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Read recorded Android diagnostics
+      - name: Inspect actual exported Reel
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh run download 34747251243 --repo "$GITHUB_REPOSITORY" --dir evidence
-          find evidence -type f -name '*logcat*' -exec sh -c 'echo "$1"; grep -E "ReelBot|AndroidRuntime|TestRunner|whisper_|FATAL|Fatal|ggml" "$1" | tail -180' sh {} \;
+          gh run download 34747988107 --repo "$GITHUB_REPOSITORY" --dir evidence
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess,base64
+          root=Path('evidence')
+          for name in ('transcript.txt','output-streams.txt','persistence.txt','android-model-download.txt','decode-errors.txt'):
+            for p in root.rglob(name):
+              print('EVIDENCE_FILE',name)
+              print(p.read_text())
+          video=next(root.rglob('verified-reel.mp4'))
+          subprocess.run(['ffmpeg','-y','-ss','5','-i',str(video),'-frames:v','1','-vf','scale=270:480','frame.jpg'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+          print('FRAME_BASE64_START')
+          print(base64.b64encode(Path('frame.jpg').read_bytes()).decode())
+          print('FRAME_BASE64_END')
+          PY
