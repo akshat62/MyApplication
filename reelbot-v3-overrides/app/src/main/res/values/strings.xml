@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">ReelBot</string>
+    <string name="notif_channel_processing">Reel processing</string>
+    <string name="notif_channel_processing_desc">Shows progress while ReelBot is turning your video into Reels</string>
+</resources>

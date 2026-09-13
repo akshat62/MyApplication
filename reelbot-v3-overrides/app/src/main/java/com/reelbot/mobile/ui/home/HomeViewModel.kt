@@ -30,24 +30,21 @@ class HomeViewModel(
 
     private val tokenVault = TokenVault(context.applicationContext)
 
+    val recentVideos = repository.observeRecentVideos().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val uiState: StateFlow<HomeUiState> = combine(
-        repository.observeTotalCount(),
-        repository.observeCount(JobStatus.READY_FOR_REVIEW),
-        repository.observeCount(JobStatus.POSTED),
-        repository.observeCount(JobStatus.FAILED)
-    ) { total, awaiting, posted, failed ->
-        val session = runCatching { tokenVault.currentSession() }.getOrNull()
+        repository.observeAllJobs(),
+        (context.applicationContext as com.reelbot.mobile.ReelBotApp).modelManager.state
+    ) { jobs, model ->
+        val session = tokenVault.currentSession()
         HomeUiState(
-            totalProcessed = total,
-            reelsGenerated = total,
-            awaitingApproval = awaiting,
-            published = posted,
-            failed = failed,
+            totalProcessed = jobs.filter { it.outputFilePath != null }.map { it.sourceImportId }.distinct().size,
+            reelsGenerated = jobs.count { it.outputFilePath != null },
+            awaitingApproval = jobs.count { it.status == JobStatus.READY_FOR_REVIEW },
+            published = jobs.count { it.status == JobStatus.POSTED },
+            failed = jobs.count { it.status == JobStatus.FAILED },
             instagramConnected = session != null,
             instagramUsername = session?.igUsername,
-            modelReady = false
+            modelReady = model in listOf(com.reelbot.mobile.data.model.ModelState.INSTALLED, com.reelbot.mobile.data.model.ModelState.READY)
         )
-    }
-        .catch { emit(HomeUiState()) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeUiState())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeUiState())
 }

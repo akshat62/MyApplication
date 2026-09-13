@@ -12,6 +12,8 @@ import kotlin.system.exitProcess
 
 class ReelBotApp : Application() {
 
+    val modelManager by lazy { com.reelbot.mobile.ai.ModelManager(this) }
+
     val database: ReelBotDatabase by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         ReelBotDatabase.getInstance(this)
     }
@@ -31,6 +33,7 @@ class ReelBotApp : Application() {
     private fun installCrashRecorder() {
         val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            Log.e("ReelBotCrash", "Uncaught exception on ${thread.name}", throwable)
             runCatching {
                 File(filesDir, LAST_CRASH_FILE).writeText(Log.getStackTraceString(throwable))
             }

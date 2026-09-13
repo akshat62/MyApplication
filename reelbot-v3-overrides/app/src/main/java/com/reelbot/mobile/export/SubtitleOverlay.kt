@@ -65,18 +65,22 @@ class SubtitleOverlay(
     }
 
     private fun drawCaption(canvas: Canvas, line: String) {
-        val safeBottom = outputHeight * (1 - subtitleStyle.bottomSafeMarginFraction)
-        val textWidth = textPaint.measureText(line)
-        val padding = 24f
-        val textHeight = textPaint.fontSpacing
-
-        val bgRect = RectF(
-            outputWidth / 2f - textWidth / 2f - padding,
-            safeBottom.toFloat() - textHeight - padding / 2,
-            outputWidth / 2f + textWidth / 2f + padding,
-            safeBottom.toFloat() + padding / 2
-        )
-        canvas.drawRoundRect(bgRect, 20f, 20f, backgroundPaint)
-        canvas.drawText(line, outputWidth / 2f, safeBottom.toFloat(), textPaint)
+        val width = (outputWidth * 0.82f).toInt()
+        val paint = android.text.TextPaint(textPaint).apply { textAlign = Paint.Align.LEFT }
+        var layout: android.text.StaticLayout
+        do {
+            layout = android.text.StaticLayout.Builder.obtain(line, 0, line.length, paint, width)
+                .setAlignment(android.text.Layout.Alignment.ALIGN_CENTER)
+                .setIncludePad(false).build()
+            if (layout.height <= outputHeight * 0.45f || paint.textSize <= 24f) break
+            paint.textSize -= 2f
+        } while (true)
+        val x = (outputWidth - width) / 2f
+        val y = outputHeight * (1 - style.bottomSafeMarginFraction) - layout.height
+        canvas.drawRoundRect(RectF(x - 16, y - 12, x + width + 16, y + layout.height + 12), 20f, 20f, backgroundPaint)
+        canvas.save()
+        canvas.translate(x, y)
+        layout.draw(canvas)
+        canvas.restore()
     }
 }

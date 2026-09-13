@@ -19,7 +19,7 @@ class HighlightEngine {
 
     private val hookWords = listOf(
         "how", "why", "secret", "mistake", "important", "best", "never", "must", "top",
-        "truth", "imagine", "here's", "remember", "biggest", "nobody", "wrong", "actually"
+        "क्यों", "कैसे", "महत्वपूर्ण", "गलती", "याद", "जरूरी", "सच", "truth", "imagine", "here's", "remember", "biggest", "nobody", "wrong", "actually"
     )
     private val stopWords = setOf(
         "about", "there", "their", "would", "could", "should", "which", "where", "these",
@@ -32,25 +32,26 @@ class HighlightEngine {
         count: Int,
         targetMs: Long
     ): List<ClipCandidate> {
+        require(count in 1..10 && targetMs > 0)
         if (segments.isEmpty()) throw PipelineException(FailureReason.NO_SPEECH_DETECTED)
 
         val rawCandidates = segments.indices
             .map { buildCandidate(segments, it, targetMs) }
             .filter { it.endMs - it.startMs >= MIN_CLIP_MS }
 
+        if (rawCandidates.isEmpty()) throw PipelineException(FailureReason.NO_HIGHLIGHTS)
         val maxRaw = rawCandidates.maxOfOrNull { it.rawScore } ?: 1.0
         val normalized = rawCandidates.sortedByDescending { it.rawScore }
 
         val picked = mutableListOf<ScoredCandidate>()
         for (candidate in normalized) {
-            val overlapsExisting = picked.any { overlapRatio(it, candidate) > MAX_OVERLAP }
+            val overlapsExisting = picked.any { overlapRatio(it, candidate) > MAX_OVERLAP || textSimilarity(it.text, candidate.text) > 0.82 }
             if (!overlapsExisting) picked.add(candidate)
             if (picked.size == count) break
         }
         if (picked.isEmpty() && rawCandidates.isNotEmpty()) picked.add(rawCandidates.first())
 
         return picked
-            .sortedBy { it.startMs }
             .map { toClipCandidate(it, maxRaw) }
     }
 
@@ -63,11 +64,10 @@ class HighlightEngine {
     )
 
     private fun toClipCandidate(candidate: ScoredCandidate, maxRawScore: Double): ClipCandidate {
-        val normalizedScore = if (maxRawScore <= 0) 50
-        else ((candidate.rawScore / maxRawScore) * 100).toInt().coerceIn(1, 100)
+        val normalizedScore = (100 * (1 - kotlin.math.exp(-candidate.rawScore / 12.0))).toInt().coerceIn(0, 100)
         val title = makeTitleFrom(candidate.text)
         val hashtags = makeHashtagsFrom(candidate.text)
-        val caption = "$title\n\n${hashtags.joinToString(" ")} #reels #shorts"
+        val caption = title
         return ClipCandidate(
             startMs = candidate.startMs,
             endMs = candidate.endMs,
@@ -121,8 +121,16 @@ class HighlightEngine {
         extended: List<TranscriptSegment>,
         fallback: List<TranscriptSegment>
     ): List<TranscriptSegment> {
-        val idx = extended.indexOfFirst { it.text.trimEnd().lastOrNull() in listOf('.', '!', '?') }
+        val desiredEnd = fallback.last().endMs
+        val idx = extended.indices.filter { extended[it].endMs - extended.first().startMs >= MIN_CLIP_MS && extended[it].text.trimEnd().lastOrNull() in listOf('.', '!', '?', '।') }
+            .minByOrNull { kotlin.math.abs(extended[it].endMs - desiredEnd) } ?: -1
         return if (idx >= 0) extended.subList(0, idx + 1) else fallback
+    }
+
+    private fun textSimilarity(a: String, b: String): Double {
+        fun words(s: String) = s.lowercase(Locale.ROOT).split(Regex("[^\\p{L}\\p{N}]+" )).filter { it.length > 2 }.toSet()
+        val x = words(a); val y = words(b)
+        return x.intersect(y).size.toDouble() / x.union(y).size.coerceAtLeast(1)
     }
 
     private fun overlapRatio(a: ScoredCandidate, b: ScoredCandidate): Double {

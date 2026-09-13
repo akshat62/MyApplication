@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Networking: Instagram/Facebook OAuth + Meta Graph API only. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Keep the CPU awake only while a foreground processing job is running. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Required to run video/AI processing as a real foreground service (Android 14+
+         requires a declared foreground service type; "mediaProcessing" was added in
+         API 34 specifically for this kind of workload, on API 26-33 the type is a no-op
+         but the service still runs foreground correctly). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROCESSING" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
+    <!-- Persistent progress notification during processing (Android 13+ requires this
+         to be requested at runtime; declared here per platform requirement). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- NOT requested: READ_MEDIA_VIDEO / READ_EXTERNAL_STORAGE. Video selection uses
+         the system document picker (ACTION_OPEN_DOCUMENT) via Storage Access Framework,
+         which needs no storage permission and gives the user explicit per-file consent. -->
+
+    <application
+        android:name=".ReelBotApp"
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:theme="@style/Theme.ReelBot"
+        android:usesCleartextTraffic="false"
+        tools:targetApi="34">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:theme="@style/Theme.ReelBot">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Instagram/Facebook OAuth redirect lands back here via Custom Tabs.
+                 Redirect URI to register in the Meta Developer App:
+                 com.reelbot.mobile://oauth/callback  (see SETUP.md) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="com.reelbot.mobile"
+                    android:host="oauth"
+                    android:path="/callback" />
+            </intent-filter>
+        </activity>
+
+        <!-- The processing pipeline runs as a WorkManager CoroutineWorker
+             (ReelPipelineWorker) using WorkManager's built-in foreground-service support
+             (Worker.setForeground), which is why no custom <service> is declared here —
+             androidx.work merges its own SystemForegroundService automatically. This is
+             what actually fixes V2's problem: V2 ran the whole pipeline on
+             MainActivity's own CoroutineScope, so it died the moment the user left the
+             app; WorkManager + a real foreground notification survives backgrounding. -->
+
+        <service android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync|mediaProcessing" tools:node="merge" />
+
+        <!-- Lets the user share/preview rendered clips and hand a file off to the
+             Instagram publish flow without exposing raw file:// paths. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_provider_paths" />
+        </provider>
+
+    </application>
+</manifest>

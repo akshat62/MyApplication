@@ -53,7 +53,7 @@ class MainActivity : ComponentActivity() {
     private fun SafeStartRoot() {
         var factory by remember { mutableStateOf<ReelBotViewModelFactory?>(null) }
         var startupError by remember { mutableStateOf<String?>(null) }
-        var previousCrash by remember { mutableStateOf(readLastCrash()) }
+        var previousCrash by remember { mutableStateOf<String?>(null) }
         var retryNonce by remember { mutableIntStateOf(0) }
 
         LaunchedEffect(retryNonce, previousCrash) {
@@ -66,6 +66,7 @@ class MainActivity : ComponentActivity() {
                     // Repository/Room initialization is deliberately deferred until after
                     // the first UI frame. A device-specific database failure can no longer
                     // terminate the process before the user sees a screen.
+                    app.database.openHelper.writableDatabase
                     ReelBotViewModelFactory(app.repository, applicationContext)
                 }
             }
@@ -74,7 +75,9 @@ class MainActivity : ComponentActivity() {
                 startupError = null
                 factory = it
             }.onFailure {
-                startupError = formatThrowable(it)
+                android.util.Log.e("ReelBotStartup", "Initialization failed", it)
+                runCatching { crashFile().writeText(android.util.Log.getStackTraceString(it)) }
+                startupError = android.util.Log.getStackTraceString(it)
             }
         }
 
@@ -135,7 +138,7 @@ class MainActivity : ComponentActivity() {
         ) {
             Text(title, style = MaterialTheme.typography.headlineSmall)
             Text(
-                "The app stayed open instead of crashing. Diagnostic details:",
+                "Initialization failed. Diagnostic details:",
                 modifier = Modifier.padding(top = 12.dp),
                 style = MaterialTheme.typography.bodyMedium
             )

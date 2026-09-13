@@ -21,6 +21,9 @@ import com.reelbot.mobile.data.model.FailureReason
 import com.reelbot.mobile.data.model.TranscriptSegment
 import com.reelbot.mobile.face.CropWindow
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import androidx.media3.common.MimeTypes
 import java.io.File
 import kotlin.coroutines.resumeWithException
 
@@ -40,7 +43,7 @@ class ReelExporter(private val context: Context) {
         segments: List<TranscriptSegment>,
         subtitlesEnabled: Boolean,
         outputFile: File
-    ): File = suspendCancellableCoroutine { cont ->
+    ): File = withContext(Dispatchers.Main.immediate) { suspendCancellableCoroutine { cont ->
         val mediaItem = MediaItem.Builder()
             .setUri(sourceVideoUri)
             .setClippingConfiguration(
@@ -53,6 +56,7 @@ class ReelExporter(private val context: Context) {
 
         val videoEffects = mutableListOf<androidx.media3.common.Effect>()
         videoEffects.add(cropEffectFor(cropWindow, srcWidth, srcHeight))
+        videoEffects.add(Presentation.createForWidthAndHeight(OUTPUT_WIDTH, OUTPUT_HEIGHT, Presentation.LAYOUT_SCALE_TO_FIT))
         if (subtitlesEnabled && segments.isNotEmpty()) {
             val overlay = SubtitleOverlay(segments, OUTPUT_WIDTH, OUTPUT_HEIGHT)
             videoEffects.add(OverlayEffect(listOf<TextureOverlay>(overlay)))
@@ -64,9 +68,14 @@ class ReelExporter(private val context: Context) {
             .build()
 
         val transformer = Transformer.Builder(context)
+            .setVideoMimeType(MimeTypes.VIDEO_H264)
+            .setAudioMimeType(MimeTypes.AUDIO_AAC)
             .addListener(object : Transformer.Listener {
                 override fun onCompleted(composition: Composition, exportResult: ExportResult) {
-                    if (cont.isActive) cont.resumeWith(Result.success(outputFile))
+                    if (cont.isActive) {
+                        val result = runCatching { validateOutput(outputFile); outputFile }
+                        cont.resumeWith(result)
+                    }
                 }
 
                 override fun onError(
@@ -84,16 +93,28 @@ class ReelExporter(private val context: Context) {
             .build()
 
         outputFile.parentFile?.mkdirs()
+        outputFile.delete()
         transformer.start(editedMediaItem, outputFile.absolutePath)
-        cont.invokeOnCancellation { transformer.cancel() }
+        cont.invokeOnCancellation { android.os.Handler(android.os.Looper.getMainLooper()).post { transformer.cancel(); outputFile.delete() } }
+    } }
+
+    private fun validateOutput(file: File) {
+        require(file.isFile && file.length() > 0) { "Export did not create a video file." }
+        val retriever = android.media.MediaMetadataRetriever()
+        try {
+            retriever.setDataSource(file.absolutePath)
+            require((retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0) > 0) { "Export has no duration." }
+            val frame = retriever.getFrameAtTime(0) ?: error("Exported video cannot be decoded.")
+            frame.recycle()
+        } finally { retriever.release() }
     }
 
     private fun cropEffectFor(window: CropWindow, srcWidth: Int, srcHeight: Int): Crop {
-        if (srcWidth <= 0 || srcHeight <= 0) return Crop(-1f, -1f, 1f, 1f)
+        if (srcWidth <= 0 || srcHeight <= 0) return Crop(-1f, 1f, -1f, 1f)
         val left = (window.left.toFloat() / srcWidth) * 2f - 1f
         val right = (window.right.toFloat() / srcWidth) * 2f - 1f
         val top = 1f - (window.top.toFloat() / srcHeight) * 2f
         val bottom = 1f - (window.bottom.toFloat() / srcHeight) * 2f
-        return Crop(left, bottom, right, top)
+        return Crop(left, right, bottom, top)
     }
 }

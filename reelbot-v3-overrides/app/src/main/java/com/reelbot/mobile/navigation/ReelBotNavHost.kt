@@ -69,8 +69,9 @@ fun ReelBotNavHost(factory: ReelBotViewModelFactory) {
                     }
                 })
             }
-            composable(ReelBotRoutes.APPROVAL) {
-                Text("Approval preview — coming in the rendering phase")
+            composable(ReelBotRoutes.APPROVAL) { entry ->
+                val vm: QueueViewModel = viewModel(factory = factory)
+                com.reelbot.mobile.ui.queue.ApprovalScreen(vm, entry.arguments?.getString("jobId") ?: "")
             }
         }
     }

@@ -11,13 +11,14 @@ android {
 
     defaultConfig {
         applicationId = "com.reelbot.mobile"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         minSdk = 26
         targetSdk = 36
         versionCode = 3
         versionName = "3.0.0"
 
         ndk {
-            abiFilters += listOf("arm64-v8a")
+            abiFilters += listOf("arm64-v8a", "x86_64")
         }
 
         externalNativeBuild {
@@ -28,7 +29,7 @@ android {
         }
 
         val metaAppId = project.findProperty("META_APP_ID") as String? ?: "REPLACE_ME_META_APP_ID"
-        val metaAppSecret = project.findProperty("META_APP_SECRET") as String? ?: ""
+        val metaAppSecret = ""
         manifestPlaceholders["metaAppId"] = metaAppId
         buildConfigField("String", "META_APP_ID", "\"$metaAppId\"")
         buildConfigField("String", "META_APP_SECRET", "\"$metaAppSecret\"")
@@ -38,7 +39,7 @@ android {
     buildTypes {
         debug {
             isMinifyEnabled = false
-            applicationIdSuffix = ".debug"
+            // Keep the requested install/launch package: com.reelbot.mobile
         }
         release {
             isMinifyEnabled = true
@@ -113,5 +114,9 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:rules:1.6.1")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
+    androidTestImplementation(platform("androidx.compose:compose-bom:2024.12.01"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
 }
