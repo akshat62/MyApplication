@@ -31,11 +31,12 @@ data class ModelDownloadProgress(val bytesRead: Long, val totalBytes: Long) {
  * a verified, installed model — per the "detect model-not-installed condition" and
  * "do not attempt transcription until the model is actually usable" requirements.
  */
-class ModelManager(private val context: Context) {
+class ModelManager(private val context: Context, networkTimeoutSeconds: Long = 900) {
 
     private val installMutex = Mutex()
 
     private val client = OkHttpClient.Builder()
+        .callTimeout(networkTimeoutSeconds, TimeUnit.SECONDS)
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(5, TimeUnit.MINUTES)
         .build()
@@ -68,6 +69,7 @@ class ModelManager(private val context: Context) {
      *  fallback to "it's probably fine." */
     suspend fun download(spec: WhisperModelSpec) = withContext(Dispatchers.IO) { installMutex.withLock {
         activeSpec = spec
+        android.util.Log.i("ReelBotModel", "Downloading ${spec.fileName}")
         _state.value = ModelState.DOWNLOADING
         val target = modelFile(spec)
         val temp = File(modelsDir, spec.fileName + ".part")
@@ -85,6 +87,7 @@ class ModelManager(private val context: Context) {
                     FailureReason.MODEL_VERIFICATION_FAILED, "Empty response body"
                 )
                 val total = body.contentLength()
+                android.util.Log.i("ReelBotModel", "HTTP ${response.code}; expected bytes=$total")
                 var bytesRead = 0L
                 temp.outputStream().use { out ->
                     body.byteStream().use { input ->
@@ -101,6 +104,7 @@ class ModelManager(private val context: Context) {
                 }
             }
 
+            android.util.Log.i("ReelBotModel", "Verifying downloaded bytes=${temp.length()}")
             _state.value = ModelState.VERIFYING
             val actualHash = sha256(temp)
             if (spec.sha256 == "REPLACE_WITH_PUBLISHED_SHA256") {
@@ -132,6 +136,7 @@ class ModelManager(private val context: Context) {
             temp.delete()
             throw e
         } catch (e: Exception) {
+            android.util.Log.e("ReelBotModel", "Download failed after ${temp.length()} bytes", e)
             _state.value = ModelState.FAILED
             temp.delete()
             throw PipelineException(FailureReason.MODEL_VERIFICATION_FAILED, e.message)

@@ -36,6 +36,7 @@ class TranscriptionEngine(private val modelManager: ModelManager) {
             throw ModelNotReadyException(ModelState.NOT_INSTALLED)
         }
 
+        android.util.Log.i("ReelBotWhisper", "Loading verified model ${spec.fileName}")
         modelManager.setRuntimeState(ModelState.LOADING)
         val ctxPtr = try {
             WhisperNative.nativeLoadModel(modelFile.absolutePath)
@@ -56,10 +57,12 @@ class TranscriptionEngine(private val modelManager: ModelManager) {
         try {
             val samples = readWavAsFloatPcm(wavFile)
             val threads = Runtime.getRuntime().availableProcessors().coerceIn(2, 6)
+            android.util.Log.i("ReelBotWhisper", "Transcribing ${samples.size} samples on $threads threads")
             val raw = WhisperNative.nativeTranscribe(ctxPtr, samples, language, threads)
                 ?: throw PipelineException(FailureReason.TRANSCRIPTION_FAILED, "whisper_full returned an error")
 
             val segments = parseSegments(raw)
+            android.util.Log.i("ReelBotWhisper", "Transcription returned ${segments.size} segments")
             if (segments.isEmpty()) {
                 throw PipelineException(FailureReason.NO_SPEECH_DETECTED)
             }

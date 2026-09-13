@@ -72,6 +72,7 @@ class ReelExporter(private val context: Context) {
             .setAudioMimeType(MimeTypes.AUDIO_AAC)
             .addListener(object : Transformer.Listener {
                 override fun onCompleted(composition: Composition, exportResult: ExportResult) {
+                    android.util.Log.i("ReelBotExport", "Media3 export completed")
                     if (cont.isActive) {
                         val result = runCatching { validateOutput(outputFile); outputFile }
                         cont.resumeWith(result)
@@ -94,6 +95,7 @@ class ReelExporter(private val context: Context) {
 
         outputFile.parentFile?.mkdirs()
         outputFile.delete()
+        android.util.Log.i("ReelBotExport", "Starting 1080x1920 export: $startMs..$endMs ms")
         transformer.start(editedMediaItem, outputFile.absolutePath)
         cont.invokeOnCancellation { android.os.Handler(android.os.Looper.getMainLooper()).post { transformer.cancel(); outputFile.delete() } }
     } }
