@@ -39,6 +39,34 @@ class LocalPipelineTest {
         app.repository.saveJob(row)
         assertEquals(output.absolutePath, app.repository.getJob(row.id)?.outputFilePath)
     }
+    @Test fun workerProducesReviewableReel() = runBlocking {
+        val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as ReelBotApp
+        val scenario = androidx.test.core.app.ActivityScenario.launch(MainActivity::class.java)
+        try {
+            val id = java.util.UUID.randomUUID().toString()
+            val video = File(app.filesDir, "real-speech-fixture.mp4")
+            app.repository.saveSourceVideo(com.reelbot.mobile.data.db.entity.SourceVideoEntity(
+                importId = id, uri = Uri.fromFile(video).toString(), displayName = video.name,
+                durationMs = 30000, fileSizeBytes = video.length(), requestedClipCount = 1, requestedDurationSeconds = 30))
+            val job = ReelJobEntity(id = id, sourceImportId = id, sourceVideoUri = Uri.fromFile(video).toString(), sourceVideoDurationMs = 30000, status = JobStatus.IMPORTED)
+            app.repository.saveJob(job)
+            com.reelbot.mobile.work.PipelineScheduler.enqueue(app, id)
+            kotlinx.coroutines.withTimeout(240000) {
+                while (true) {
+                    val status = app.repository.getJob(id)?.status
+                    if (status == JobStatus.READY_FOR_REVIEW || status == JobStatus.FAILED || status == JobStatus.CANCELLED) break
+                    kotlinx.coroutines.delay(500)
+                }
+            }
+            val completed = app.repository.getJob(id)!!
+            assertEquals(completed.failureDetail, JobStatus.READY_FOR_REVIEW, completed.status)
+            assertNotNull(completed.highlightScore)
+            assertFalse(completed.caption.isNullOrBlank())
+            assertFalse(completed.transcriptExcerpt.isNullOrBlank())
+            assertTrue(File(completed.outputFilePath!!).isFile)
+        } finally { scenario.close() }
+    }
+
     @Test fun missingModelFailsHonestly() = runBlocking {
         val app = InstrumentationRegistry.getInstrumentation().targetContext
         val manager = ModelManager(app)

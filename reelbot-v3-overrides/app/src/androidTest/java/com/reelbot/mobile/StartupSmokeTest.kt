@@ -15,7 +15,7 @@ class StartupSmokeTest {
                 compose.waitForIdle()
             }
         }
-        compose.onNodeWithText("Create Reels").performClick()
+        compose.onNodeWithText("Create Reels", useUnmergedTree = true).performClick()
         compose.onNodeWithText("Select video").assertExists()
         compose.onAllNodesWithText("Home").onLast().performClick()
         compose.activityRule.scenario.recreate()
