@@ -2,7 +2,7 @@
 
 ## Outcome
 
-The local video-to-Reel pipeline has passed Android runtime testing. This is **not full acceptance of every requested feature**: Instagram OAuth/live publication remain unfinished, and the additional Android player and face-composition tests have not executed because GitHub has not assigned their queued jobs a runner.
+The local video-to-Reel pipeline has passed Android runtime testing. This is **not full acceptance of every requested feature**: Instagram OAuth/live publication remain unfinished, but Android player playback and detection-driven face composition have now also passed focused runtime tests.
 
 Verified application source commit: `8879ca4bb44daabccb85129804d68e0ed9614d58`.
 Later commit `626edcb06c79b0b4ec2b3489972e5f1ebcdfef84` adds playback/face tests and packaging changes; it does not change production application code.
@@ -45,19 +45,18 @@ Device: Android 15/API 35 AOSP x86_64 emulator, hardware-accelerated GitHub Ubun
 | Subtitles | PASS: inspected exported frame; actual Whisper text wraps inside the portrait safe zone |
 | Restart / Room queue persistence | PASS after force-stop and relaunch |
 | Missing Instagram configuration | PASS: explicit setup error, no crash |
-| Android VideoView playback-event test | NOT EXECUTED; queued |
-| Detection-driven crop / retained face in output test | NOT EXECUTED; queued |
+| Android VideoView playback-event test | PASS; frame-render event received and playback position advanced |
+| Detection-driven crop / retained face in output test | PASS; off-center face changed crop, and face was detected near center of the exported frame |
 | Live Instagram OAuth / publication | NOT IMPLEMENTED / NOT VERIFIED |
 | Physical arm64/Xiaomi runtime | NOT TESTED |
 
 [Successful complete local-pipeline run](https://github.com/akshat62/MyApplication/actions/runs/34747988107).
 [Exported-frame and metadata inspection](https://github.com/akshat62/MyApplication/actions/runs/34748513696).
-[Queued extended test run](https://github.com/akshat62/MyApplication/actions/runs/34748502463).
-[Queued focused playback/face run](https://github.com/akshat62/MyApplication/actions/runs/34748709520).
+[Successful focused playback/face verification](https://github.com/akshat62/MyApplication/actions/runs/34748943778). The redundant queued full rerun is being cancelled.
 
-The successful startup test took 8.7 seconds, three pipeline tests 243.8 seconds, and persistence test 0.032 seconds. Real transcription took approximately 70 seconds for 30 seconds of speech on this emulator. These are emulator observations, not performance promises for a phone.
+The successful startup test took 8.7 seconds, three pipeline tests 243.8 seconds, and persistence test 0.032 seconds. Focused Android playback passed in 3.6 seconds and face-composition verification in 5.1 seconds. Real transcription took approximately 70 seconds for 30 seconds of speech on this emulator. These are emulator observations, not performance promises for a phone.
 
-The main fixture uses the real JFK speech WAV supplied with whisper.cpp, repeated into a 30-second MP4 with a generated video test pattern. It is not a natural moving-speaker video. The planned face test uses a NASA astronaut portrait distributed with scikit-image, deliberately placed off-center.
+The main fixture uses the real JFK speech WAV supplied with whisper.cpp, repeated into a 30-second MP4 with a generated video test pattern. It is not a natural moving-speaker video. The executed face test uses a NASA astronaut portrait distributed with scikit-image, deliberately placed off-center.
 
 Media3 stores the video as 1920 × 1080 with a -90-degree display matrix; standard playback presents 1080 × 1920 portrait. The inspected output frame is upright and its subtitles are readable.
 
@@ -80,7 +79,7 @@ Media3 stores the video as 1920 × 1080 with a -90-degree display matrix; standa
 - Meta Developer configuration, approved permissions, an eligible Instagram Professional account and network access are required for future official publishing.
 - Initial model preparation requires network access and roughly 148 MB of model storage. Local transcription/rendering require no PC or self-hosted backend after preparation.
 - Input videos are limited to 30 minutes. Usable RAM, free storage and Android H.264/AAC decoding/encoding capability are required; physical-device performance is unverified.
-- Face composition currently uses one averaged crop per clip with center fallback, not continuous tracking. Only center fallback was exercised in the successful pipeline run.
-- Direct Android player playback, detection-influenced face composition, physical rotation, invalid-video/network-failure combinations and physical Xiaomi behavior need further executed tests.
+- Face composition currently uses one averaged crop per clip with center fallback, not continuous tracking. The pipeline exercised center fallback, and the focused test separately verified detection-driven composition in a real exported frame. Moving-face tracking was not tested or implemented.
+- Physical rotation, invalid-video/network-failure combinations and physical Xiaomi behavior need further executed tests.
 - Retained logs help diagnose managed exceptions. Fatal native/VM failures cannot safely be swallowed.
-- The local workspace disconnected during verification; remaining work was preserved through GitHub. No unexecuted test is counted as passing.
+- The local workspace disconnected during verification; remaining work was completed through GitHub. Focused tests reused the verified application APK with a temporary test signing identity; production application code was unchanged. The delivered APK is the original artifact from the successful complete pipeline run. No unexecuted test is counted as passing.
